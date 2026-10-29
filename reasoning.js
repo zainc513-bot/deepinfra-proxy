@@ -4,22 +4,20 @@ const SHOW_REASONING = process.env.SHOW_REASONING === 'true';
 if (SHOW_REASONING) console.log('[CONFIG] Reasoning display: ENABLED');
 
 function getReasoningPayload(model, enableThinking, clientReasoningEffort) {
-  // For DeepInfra GLM, if the client doesn't specify, force 'low' to prevent the 
-  // model from thinking for 60 seconds before streaming.
-  if (model.includes('glm-5.3') || model.includes('glm-5-3')) {
+  // FIX: Make the check case-insensitive so "GLM-5.3-Flash" matches
+  const m = (model || '').toLowerCase(); 
+
+  if (m.includes('glm-5.3') || m.includes('glm-5-3')) {
     const level = clientReasoningEffort || 'low';
-    // If they explicitly asked to turn it off
     if (level === 'off' || level === 'none') return { reasoning_effort: 'none' };
     return { reasoning_effort: level };
   }
 
-  // For DeepSeek on DeepInfra
-  if (model.includes('deepseek')) {
+  if (m.includes('deepseek')) {
     if (clientReasoningEffort === 'off') return { chat_template_kwargs: { thinking: false } };
     return { reasoning_effort: clientReasoningEffort || 'high' };
   }
 
-  // Standard OpenAI-style
   if (clientReasoningEffort && clientReasoningEffort !== 'off' && clientReasoningEffort !== 'on') {
     return { reasoning_effort: clientReasoningEffort };
   }
@@ -64,7 +62,7 @@ class DelimiterParser {
 
 class StreamNormalizer {
   constructor(model) {
-    this.parser = model.includes('minimax') ? new DelimiterParser('<mm:think>', '</mm:think>') : null;
+    this.parser = model.toLowerCase().includes('minimax') ? new DelimiterParser('<mm:think>', '</mm:think>') : null;
   }
   processDelta(delta) {
     const out = { ...delta };
@@ -87,7 +85,7 @@ function normalizeNonStreamChoice(choice, model) {
   const msg = choice.message || {};
   let r = msg.reasoning || msg.reasoning_content || '';
   let c = msg.content || '';
-  if (!r && c && model.includes('minimax')) {
+  if (!r && c && model.toLowerCase().includes('minimax')) {
     const p = new DelimiterParser('<mm:think>', '</mm:think>');
     const parsed = p.process(c);
     const flushed = p.flush();
