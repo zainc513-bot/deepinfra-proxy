@@ -20,8 +20,8 @@ const ENABLE_THINKING_MODE = process.env.ENABLE_THINKING_MODE === 'true';
 const MAX_TOKENS_LIMIT = 65536;
 const DEFAULT_MAX_TOKENS = Number(process.env.DEFAULT_MAX_TOKENS) || 4096;
 const HEARTBEAT_INTERVAL_MS = 10000;
-const REQUEST_TIMEOUT_MS = 60000;
-const THINKING_DEADLINE_MS = 60000;
+const REQUEST_TIMEOUT_MS = 90000;
+const THINKING_DEADLINE_MS = 90000;
 
 const keepAliveAgent = new https.Agent({ keepAlive: true, maxSockets: 50 });
 const nim = axios.create({ baseURL: NIM_API_BASE, httpsAgent: keepAliveAgent });
@@ -32,13 +32,12 @@ function validateConfig() {
 }
 validateConfig();
 
-// ─── Model Mapping (DeepInfra) ───
 const MODEL_MAPPING = {
   'gpt-4': 'meta-llama/Meta-Llama-3.1-70B-Instruct',
   'gpt-3.5-turbo': 'meta-llama/Meta-Llama-3.1-8B-Instruct',
   'gpt-4-flash': 'zai-org/glm-5.3-flash', 
   'glm-flash': 'zai-org/glm-5.3-flash',           
-  'zai-org/GLM-5.3-Flash': 'zai-org/glm-5.3-flash', // FIX: Force lowercase map
+  'zai-org/GLM-5.3-Flash': 'zai-org/glm-5.3-flash',
   'deepseek': 'deepseek-ai/DeepSeek-V3',
   'llama-3.1-8b': 'meta-llama/Meta-Llama-3.1-8B-Instruct',
   'claude-3-sonnet': 'mistralai/Mixtral-8x7B-Instruct-v0.1',
@@ -55,7 +54,6 @@ function resolveModelId(name) {
   return null;
 }
 
-// ─── Middleware ───
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
@@ -73,7 +71,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// ─── Helpers ───
 function safeWrite(res, data) {
   try { if (!res.writableEnded && !res.destroyed) res.write(data); } catch {}
 }
@@ -116,7 +113,6 @@ async function postToUpstream(payload, signal) {
   }
 }
 
-// ─── Routes ───
 app.get('/', (req, res) => res.send('DeepInfra Proxy is running.'));
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 app.get('/v1/models', (req, res) => {
@@ -212,7 +208,16 @@ app.post('/v1/chat/completions', async (req, res) => {
     let buffer = '', reasoningOpen = false, stats = { chars: 0, reason: 0 }, sawTool = false;
 
     progressTimer = setInterval(() => {
-      console.log(`[PROGRESS] ${usedModel} | ${Math.round((Date.now() - startTime)/1000)}s | Reasoning: ~${Math.round(stats.reason/4)} tk | Content: ~${Math.round(stats.chars/4)} tk`);
+      const elapsed = Math.round((Date.now() - startTime) / 1000);
+      const rTokens = Math.round(stats.reason / 4);
+      const cTokens = Math.round(stats.chars / 4);
+      
+      // Determine what phase we are in
+      let phase = "Thinking";
+      if (cTokens > 0) phase = "Streaming";
+      else if (sawTool) phase = "Tool Call";
+
+      console.log(`[PROGRESS] ${usedModel} | ${elapsed}s | Phase: ${phase} | Reason: ~${rTokens} tk | Content: ~${cTokens} tk`);
     }, 5000);
 
     const processLine = (line) => {
