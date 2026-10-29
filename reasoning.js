@@ -4,11 +4,11 @@ const SHOW_REASONING = process.env.SHOW_REASONING === 'true';
 if (SHOW_REASONING) console.log('[CONFIG] Reasoning display: ENABLED');
 
 function getReasoningPayload(model, enableThinking, clientReasoningEffort) {
-  // FIX: Make the check case-insensitive so "GLM-5.3-Flash" matches
   const m = (model || '').toLowerCase(); 
 
   if (m.includes('glm-5.3') || m.includes('glm-5-3')) {
-    const level = clientReasoningEffort || 'low';
+    // We want it to think deeply (high) before writing.
+    const level = clientReasoningEffort || 'high'; 
     if (level === 'off' || level === 'none') return { reasoning_effort: 'none' };
     return { reasoning_effort: level };
   }
@@ -25,7 +25,6 @@ function getReasoningPayload(model, enableThinking, clientReasoningEffort) {
   return {};
 }
 
-// ─── Stream Normalizer (Kept for compatibility) ───
 class DelimiterParser {
   constructor(open, close) { this.open = open; this.close = close; this.in = false; this.buf = ''; }
   process(chunk) {
