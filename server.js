@@ -12,7 +12,6 @@ const { extractLeakedToolCalls, ToolCallStreamRecovery } = require('./tools');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ─── Configuration ───
 const NIM_API_BASE = process.env.NIM_API_BASE || 'https://api.deepinfra.com/v1/openai'; 
 const NIM_API_KEY = process.env.NIM_API_KEY;
 const CLIENT_AUTH_KEY = process.env.CLIENT_AUTH_KEY;
@@ -39,6 +38,7 @@ const MODEL_MAPPING = {
   'gpt-3.5-turbo': 'meta-llama/Meta-Llama-3.1-8B-Instruct',
   'gpt-4-flash': 'zai-org/glm-5.3-flash', 
   'glm-flash': 'zai-org/glm-5.3-flash',           
+  'zai-org/GLM-5.3-Flash': 'zai-org/glm-5.3-flash', // FIX: Force lowercase map
   'deepseek': 'deepseek-ai/DeepSeek-V3',
   'llama-3.1-8b': 'meta-llama/Meta-Llama-3.1-8B-Instruct',
   'claude-3-sonnet': 'mistralai/Mixtral-8x7B-Instruct-v0.1',
@@ -149,7 +149,6 @@ app.post('/v1/chat/completions', async (req, res) => {
       res.setHeader('X-Accel-Buffering', 'no');
       res.flushHeaders();
       
-      // SPEED FIX: Disable Nagle's Algorithm for instant streaming
       if (res.socket) res.socket.setNoDelay(true);
 
       safeWrite(res, ': connected\n\n');
@@ -168,7 +167,7 @@ app.post('/v1/chat/completions', async (req, res) => {
     };
     delete baseReq.model; 
     delete baseReq.reasoning_effort;
-    delete baseReq.stream_options; // Strip this for max streaming speed
+    delete baseReq.stream_options; 
 
     const payload = { ...baseReq, model: primary, ...getReasoningPayload(primary, ENABLE_THINKING_MODE, reasoning_effort) };
     console.log(`[UPSTREAM] Sending request to ${primary} | payload: ${JSON.stringify(payload.reasoning_effort || {})}`);
