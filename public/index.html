@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DeepInfra Proxy Dashboard</title>
+  <style>
+    :root {
+      --bg: #0f111a;
+      --panel: #1a1d2d;
+      --border: #2a2e45;
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+      --accent: #6366f1;
+      --accent-hover: #4f46e5;
+      --success: #10b981;
+      --danger: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); height: 100vh; display: flex; overflow: hidden; }
+    
+    /* Sidebar */
+    .sidebar { width: 320px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px; gap: 20px; overflow-y: auto; }
+    .logo { font-size: 1.5rem; font-weight: 700; background: linear-gradient(to right, #818cf8, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .status-badge { display: flex; align-items: center; gap: 8px; font-size: 0.875rem; background: rgba(16, 185, 129, 0.1); color: var(--success); padding: 6px 12px; border-radius: 20px; border: 1px solid rgba(16, 185, 129, 0.2); width: fit-content; }
+    .status-dot { width: 8px; height: 8px; background: var(--success); border-radius: 50%; box-shadow: 0 0 8px var(--success); }
+    
+    .form-group { display: flex; flex-direction: column; gap: 6px; }
+    .form-group label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600; }
+    input, select, textarea { background: #0f111a; border: 1px solid var(--border); color: var(--text); padding: 10px 12px; border-radius: 8px; font-size: 0.875rem; outline: none; transition: border 0.2s; }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent); }
+    button { background: var(--accent); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: background 0.2s; display: flex; justify-content: center; align-items: center; gap: 8px; }
+    button:hover { background: var(--accent-hover); }
+    
+    .info-box { background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.2); padding: 12px; border-radius: 8px; font-size: 0.8rem; color: #a5b4fc; line-height: 1.5; }
+    .copy-btn { background: #2a2e45; padding: 6px; font-size: 0.75rem; margin-top: 8px; width: 100%; }
+
+    /* Main Chat Area */
+    .main { flex: 1; display: flex; flex-direction: column; background: #0b0d14; }
+    .chat-header { padding: 15px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; background: var(--panel); }
+    .chat-header h2 { font-size: 1rem; font-weight: 500; color: var(--text-muted); }
+    .stats { display: flex; gap: 15px; font-size: 0.8rem; color: var(--text-muted); }
+    
+    .chat-box { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 16px; scroll-behavior: smooth; }
+    .message { display: flex; gap: 12px; max-width: 85%; }
+    .message.user { align-self: flex-end; flex-direction: row-reverse; }
+    .avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.8rem; flex-shrink: 0; }
+    .user .avatar { background: var(--accent); }
+    .assistant .avatar { background: #10b981; }
+    .bubble { padding: 12px 16px; border-radius: 12px; line-height: 1.6; font-size: 0.95rem; white-space: pre-wrap; word-wrap: break-word; }
+    .user .bubble { background: var(--accent); color: white; border-bottom-right-radius: 4px; }
+    .assistant .bubble { background: var(--panel); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
+    .bubble.thinking { color: var(--text-muted); font-style: italic; background: transparent; border: 1px dashed var(--border); }
+
+    .input-area { padding: 20px; border-top: 1px solid var(--border); background: var(--panel); display: flex; gap: 12px; }
+    .input-area textarea { flex: 1; resize: none; height: 50px; padding-top: 15px; }
+    .input-area button { width: 50px; height: 50px; padding: 0; border-radius: 8px; }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #3f4460; }
+  </style>
+</head>
+<body>
+
+  <div class="sidebar">
+    <div class="logo">DeepInfra Proxy</div>
+    <div class="status-badge">
+      <div class="status-dot"></div>
+      <span id="status-text">Connecting...</span>
+    </div>
+
+    <div class="form-group">
+      <label>API Key (CLIENT_AUTH_KEY)</label>
+      <input type="password" id="apiKey" placeholder="Enter your proxy key..." oninput="saveSettings()">
+    </div>
+
+    <div class="form-group">
+      <label>Model</label>
+      <select id="model" onchange="saveSettings()">
+        <option value="glm-flash">GLM-5.3-Flash (Roleplay)</option>
+        <option value="deepseek">DeepSeek-V3</option>
+        <option value="llama-3.1-8b">Llama-3.1-8B</option>
+        <option value="mistral">Mistral-7B</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>System Prompt</label>
+      <textarea id="systemPrompt" rows="3" placeholder="Optional system instructions..." oninput="saveSettings()">You are a helpful AI assistant.</textarea>
+    </div>
+
+    <div class="form-group">
+      <label>Reasoning Effort</label>
+      <select id="reasoningEffort" onchange="saveSettings()">
+        <option value="high">High (Slower, better RP)</option>
+        <option value="low">Low (Faster, less depth)</option>
+        <option value="off">Off (No thinking)</option>
+      </select>
+    </div>
+
+    <div class="info-box">
+      <strong>SillyTavern Setup:</strong><br><br>
+      <b>Base URL:</b><br>
+      <span id="proxy-url" style="color:var(--text)"></span>
+      <button class="copy-btn" onclick="copyUrl()">Copy Base URL</button>
+      <br><br>
+      <b>Password:</b> Your API Key above.<br>
+      <b>Model:</b> glm-flash
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="chat-header">
+      <h2>Playground (Streaming)</h2>
+      <div class="stats">
+        <span id="latency">Latency: -- ms</span>
+        <span id="tokens">Tokens: --</span>
+      </div>
+    </div>
+    
+    <div class="chat-box" id="chat-box">
+      <div class="message assistant">
+        <div class="avatar">AI</div>
+        <div class="bubble">Hello! I am connected to your proxy. Type a message below to test the streaming and model performance.</div>
+      </div>
+    </div>
+
+    <div class="input-area">
+      <textarea id="userInput" placeholder="Type your message here..." onkeydown="if(event.key==='Enter' && !event.shiftKey){event.preventDefault(); sendMessage();}"></textarea>
+      <button onclick="sendMessage()" id="sendBtn">↑</button>
+    </div>
+  </div>
+
+  <script>
+    // Load settings
+    const apiKeyEl = document.getElementById('apiKey');
+    const modelEl = document.getElementById('model');
+    const systemPromptEl = document.getElementById('systemPrompt');
+    const reasoningEffortEl = document.getElementById('reasoningEffort');
+    const chatBox = document.getElementById('chat-box');
+    const userInput = document.getElementById('userInput');
+    const sendBtn = document.getElementById('sendBtn');
+    
+    // Initialize URL display
+    document.getElementById('proxy-url').textContent = window.location.origin + '/v1';
+
+    function saveSettings() {
+      localStorage.setItem('proxy_key', apiKeyEl.value);
+      localStorage.setItem('proxy_model', modelEl.value);
+      localStorage.setItem('proxy_sys', systemPromptEl.value);
+      localStorage.setItem('proxy_effort', reasoningEffortEl.value);
+    }
+
+    function loadSettings() {
+      apiKeyEl.value = localStorage.getItem('proxy_key') || '';
+      modelEl.value = localStorage.getItem('proxy_model') || 'glm-flash';
+      systemPromptEl.value = localStorage.getItem('proxy_sys') || 'You are a helpful AI assistant.';
+      reasoningEffortEl.value = localStorage.getItem('proxy_effort') || 'high';
+    }
+    loadSettings();
+
+    function copyUrl() {
+      navigator.clipboard.writeText(window.location.origin + '/v1');
+      const btn = document.querySelector('.copy-btn');
+      btn.textContent = 'Copied!';
+      setTimeout(() => btn.textContent = 'Copy Base URL', 2000);
+    }
+
+    // Check Health
+    fetch('/health').then(r => r.json()).then(d => {
+      document.getElementById('status-text').textContent = 'System Online';
+    }).catch(() => {
+      document.getElementById('status-text').textContent = 'System Offline';
+      document.querySelector('.status-dot').style.background = 'var(--danger)';
+      document.querySelector('.status-badge').style.color = 'var(--danger)';
+      document.querySelector('.status-badge').style.background = 'rgba(239, 68, 68, 0.1)';
+    });
+
+    let conversation = [];
+
+    async function sendMessage() {
+      const text = userInput.value.trim();
+      const key = apiKeyEl.value.trim();
+      const model = modelEl.value;
+      
+      if (!text) return;
+      if (!key) return alert("Please enter your API Key in the sidebar.");
+
+      userInput.value = '';
+      appendMessage('user', text);
+      conversation.push({ role: 'user', content: text });
+
+      const start = Date.now();
+      let firstChunk = true;
+      let tokenCount = 0;
+
+      const aiBubble = appendMessage('assistant', '...', true);
+      
+      try {
+        const messages = [{ role: 'system', content: systemPromptEl.value }];
+        for (const msg of conversation) messages.push(msg);
+
+        const res = await fetch('/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': 'Bearer ' + key,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: messages,
+            stream: true,
+            reasoning_effort: reasoningEffortEl.value
+          })
+        });
+
+        if (!res.ok) {
+          const err = await res.json();
+          throw new Error(err.error?.message || 'Request failed');
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let fullText = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n');
+          
+          for (const line of lines) {
+            if (line.startsWith('data: ') && line.trim() !== 'data: [DONE]') {
+              try {
+                const data = JSON.parse(line.slice(6));
+                const delta = data.choices[0]?.delta;
+                
+                if (delta?.reasoning_content && firstChunk) {
+                  aiBubble.textContent = "Thinking...";
+                  aiBubble.classList.add('thinking');
+                }
+
+                if (delta?.content) {
+                  if (firstChunk) {
+                    aiBubble.textContent = '';
+                    aiBubble.classList.remove('thinking');
+                    document.getElementById('latency').textContent = `Latency: ${Date.now() - start} ms`;
+                    firstChunk = false;
+                  }
+                  aiBubble.textContent += delta.content;
+                  fullText += delta.content;
+                  tokenCount++;
+                  document.getElementById('tokens').textContent = `Tokens: ~${Math.round(tokenCount * 3.5)}`;
+                  chatBox.scrollTop = chatBox.scrollHeight;
+                }
+              } catch (e) {}
+            }
+          }
+        }
+        conversation.push({ role: 'assistant', content: fullText });
+
+      } catch (err) {
+        aiBubble.textContent = "Error: " + err.message;
+        aiBubble.style.color = "var(--danger)";
+      }
+    }
+
+    function appendMessage(role, text, isTemp = false) {
+      const msgDiv = document.createElement('div');
+      msgDiv.className = `message ${role}`;
+      
+      const avatar = document.createElement('div');
+      avatar.className = 'avatar';
+      avatar.textContent = role === 'user' ? 'You' : 'AI';
+      
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      bubble.textContent = text;
+      if (isTemp) bubble.classList.add('thinking');
+      
+      msgDiv.appendChild(avatar);
+      msgDiv.appendChild(bubble);
+      chatBox.appendChild(msgDiv);
+      chatBox.scrollTop = chatBox.scrollHeight;
+      
+      return bubble;
+    }
+  </script>
+</body>
+</html>
