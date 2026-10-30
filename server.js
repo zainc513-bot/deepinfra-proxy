@@ -1,9 +1,10 @@
-// server.js — Clean OpenAI-compatible proxy (DeepInfra Optimized)
+// server.js — Clean OpenAI-compatible proxy (DeepInfra Optimized + UI Password)
 
 const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const https = require('https');
+const path = require('path');
 const { StringDecoder } = require('string_decoder');
 const { timingSafeEqual, createHash } = require('crypto');
 const { SHOW_REASONING, getReasoningPayload, StreamNormalizer, normalizeNonStreamChoice } = require('./reasoning');
@@ -28,7 +29,7 @@ const nim = axios.create({ baseURL: NIM_API_BASE, httpsAgent: keepAliveAgent });
 
 function validateConfig() {
   if (!NIM_API_KEY) { console.error('[FATAL] NIM_API_KEY is required.'); process.exit(1); }
-  if (!CLIENT_AUTH_KEY) console.warn('[WARN] CLIENT_AUTH_KEY not set. All requests will be rejected.');
+  if (!CLIENT_AUTH_KEY) { console.error('[FATAL] CLIENT_AUTH_KEY is required to protect the site.'); process.exit(1); }
 }
 validateConfig();
 
@@ -54,6 +55,7 @@ function resolveModelId(name) {
   return null;
 }
 
+// ─── Middleware ───
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
@@ -62,8 +64,32 @@ function safeTimingEqual(a, b) {
   return timingSafeEqual(createHash('sha256').update(a).digest(), createHash('sha256').update(b).digest());
 }
 
+// ─── 1. WEBSITE PASSWORD (Basic Auth) ───
+// This blocks the dashboard UI from loading unless they enter the CLIENT_AUTH_KEY.
 app.use((req, res, next) => {
-  if (req.path === '/health' || req.path === '/' || req.path === '/v1/models') return next();
+  // Protect the dashboard HTML and assets, but let API routes pass through to the next middleware
+  if (req.method === 'GET' && req.path !== '/health' && req.path !== '/v1/models' && !req.path.startsWith('/v1/chat')) {
+    const b64auth = (req.headers.authorization || '').split(' ')[1] || '';
+    const [login, password] = Buffer.from(b64auth, 'base64').toString().split(':');
+    
+    // We use the CLIENT_AUTH_KEY as the password. Username can be anything.
+    if (login && password && safeTimingEqual(password, CLIENT_AUTH_KEY)) {
+      return next();
+    }
+    
+    res.set('WWW-Authenticate', 'Basic realm="Proxy Dashboard"');
+    return res.status(401).send('Authentication required. Enter any username and your CLIENT_AUTH_KEY as the password.');
+  }
+  next();
+});
+
+// ─── 2. Serve the Dashboard UI ───
+app.use(express.static(path.join(__dirname, 'public')));
+
+// ─── 3. API AUTH (Bearer Token) ───
+app.use((req, res, next) => {
+  if (req.path === '/health' || req.path === '/v1/models') return next();
+  
   const token = req.headers.authorization?.replace('Bearer ', '').trim();
   if (!token || !CLIENT_AUTH_KEY || !safeTimingEqual(token, CLIENT_AUTH_KEY)) {
     return res.status(403).json({ error: { message: 'Forbidden', type: 'authentication_error', code: 403 } });
@@ -113,7 +139,6 @@ async function postToUpstream(payload, signal) {
   }
 }
 
-app.get('/', (req, res) => res.send('DeepInfra Proxy is running.'));
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 app.get('/v1/models', (req, res) => {
   res.json({ object: 'list', data: Object.keys(MODEL_MAPPING).map(id => ({ id, object: 'model', owned_by: 'proxy' })) });
@@ -146,7 +171,6 @@ app.post('/v1/chat/completions', async (req, res) => {
       res.flushHeaders();
       
       if (res.socket) res.socket.setNoDelay(true);
-
       safeWrite(res, ': connected\n\n');
       heartbeat = setInterval(() => safeWrite(res, ': keep-alive\n\n'), HEARTBEAT_INTERVAL_MS);
     }
@@ -211,12 +235,7 @@ app.post('/v1/chat/completions', async (req, res) => {
       const elapsed = Math.round((Date.now() - startTime) / 1000);
       const rTokens = Math.round(stats.reason / 4);
       const cTokens = Math.round(stats.chars / 4);
-      
-      // Determine what phase we are in
-      let phase = "Thinking";
-      if (cTokens > 0) phase = "Streaming";
-      else if (sawTool) phase = "Tool Call";
-
+      let phase = cTokens > 0 ? "Streaming" : "Thinking";
       console.log(`[PROGRESS] ${usedModel} | ${elapsed}s | Phase: ${phase} | Reason: ~${rTokens} tk | Content: ~${cTokens} tk`);
     }, 5000);
 
