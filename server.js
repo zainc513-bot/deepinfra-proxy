@@ -1,4 +1,4 @@
-// server.js — Clean OpenAI-compatible proxy (DeepInfra Optimized + UI Password)
+// server.js — Clean OpenAI-compatible proxy (DeepInfra Optimized)
 
 const express = require('express');
 const cors = require('cors');
@@ -16,6 +16,11 @@ const PORT = process.env.PORT || 3000;
 const NIM_API_BASE = process.env.NIM_API_BASE || 'https://api.deepinfra.com/v1/openai'; 
 const NIM_API_KEY = process.env.NIM_API_KEY;
 const CLIENT_AUTH_KEY = process.env.CLIENT_AUTH_KEY;
+
+// Renamed from ADMIN_PASSWORD so it looks innocuous
+const SYS_OPS_KEY = process.env.SYS_OPS_KEY; 
+const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL;
+
 const ENABLE_THINKING_MODE = process.env.ENABLE_THINKING_MODE === 'true';
 
 const MAX_TOKENS_LIMIT = 65536;
@@ -24,12 +29,20 @@ const HEARTBEAT_INTERVAL_MS = 10000;
 const REQUEST_TIMEOUT_MS = 90000;
 const THINKING_DEADLINE_MS = 90000;
 
+// Security State
+const blockedIPs = new Set();
+const flaggedRequests = [];
+const rateLimits = new Map();
+
+const SUS_WORDS = ['csam', 'child porn', 'kill yourself', 'make a bomb', 'terrorist attack', 'meth recipe'];
+
 const keepAliveAgent = new https.Agent({ keepAlive: true, maxSockets: 50 });
 const nim = axios.create({ baseURL: NIM_API_BASE, httpsAgent: keepAliveAgent });
 
 function validateConfig() {
   if (!NIM_API_KEY) { console.error('[FATAL] NIM_API_KEY is required.'); process.exit(1); }
-  if (!CLIENT_AUTH_KEY) { console.error('[FATAL] CLIENT_AUTH_KEY is required to protect the site.'); process.exit(1); }
+  if (!CLIENT_AUTH_KEY) { console.error('[FATAL] CLIENT_AUTH_KEY is required for users.'); process.exit(1); }
+  if (!SYS_OPS_KEY) { console.error('[FATAL] SYS_OPS_KEY is required for system operations.'); process.exit(1); }
 }
 validateConfig();
 
@@ -46,7 +59,6 @@ const MODEL_MAPPING = {
 };
 
 const DEFAULT_MODEL = 'zai-org/glm-5.3-flash';
-const FALLBACK_MODELS = [];
 
 function resolveModelId(name) {
   if (typeof name !== 'string') return null;
@@ -55,7 +67,6 @@ function resolveModelId(name) {
   return null;
 }
 
-// ─── Middleware ───
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
@@ -64,31 +75,59 @@ function safeTimingEqual(a, b) {
   return timingSafeEqual(createHash('sha256').update(a).digest(), createHash('sha256').update(b).digest());
 }
 
-// ─── 1. WEBSITE PASSWORD (Basic Auth) ───
-// This blocks the dashboard UI from loading unless they enter the CLIENT_AUTH_KEY.
+function getIP(req) {
+  const xff = req.headers['x-forwarded-for'];
+  if (xff) return xff.split(',')[0].trim();
+  return req.socket.remoteAddress || 'unknown';
+}
+
+// ─── 1. SECURITY MIDDLEWARE (IP Block & Rate Limit) ───
 app.use((req, res, next) => {
-  // Protect the dashboard HTML and assets, but let API routes pass through to the next middleware
-  if (req.method === 'GET' && req.path !== '/health' && req.path !== '/v1/models' && !req.path.startsWith('/v1/chat')) {
-    const b64auth = (req.headers.authorization || '').split(' ')[1] || '';
-    const [login, password] = Buffer.from(b64auth, 'base64').toString().split(':');
-    
-    // We use the CLIENT_AUTH_KEY as the password. Username can be anything.
-    if (login && password && safeTimingEqual(password, CLIENT_AUTH_KEY)) {
-      return next();
+  const ip = getIP(req);
+  if (blockedIPs.has(ip)) {
+    return res.status(403).json({ error: { message: 'Your IP has been blocked by the administrator.', type: 'security_error' } });
+  }
+
+  const now = Date.now();
+  if (!rateLimits.has(ip)) rateLimits.set(ip, { count: 1, lastReset: now });
+  else {
+    const limit = rateLimits.get(ip);
+    if (now - limit.lastReset > 60000) {
+      limit.count = 1;
+      limit.lastReset = now;
+    } else {
+      limit.count++;
+      if (limit.count > 60) {
+        blockedIPs.add(ip);
+        return res.status(429).json({ error: { message: 'Rate limit exceeded. IP auto-blocked.', type: 'rate_limit' } });
+      }
     }
-    
-    res.set('WWW-Authenticate', 'Basic realm="Proxy Dashboard"');
-    return res.status(401).send('Authentication required. Enter any username and your CLIENT_AUTH_KEY as the password.');
   }
   next();
 });
 
-// ─── 2. Serve the Dashboard UI ───
+// ─── 2. WEBSITE PASSWORD ───
+app.use((req, res, next) => {
+  // We only protect the UI files (HTML/CSS/JS), not the API
+  if (req.method === 'GET' && req.path !== '/health' && req.path !== '/v1/models' && !req.path.startsWith('/v1/chat') && !req.path.startsWith('/_sys')) {
+    const b64auth = (req.headers.authorization || '').split(' ')[1] || '';
+    const [login, password] = Buffer.from(b64auth, 'base64').toString().split(':');
+    
+    // UI is locked behind the SYS_OPS_KEY
+    if (login && password && safeTimingEqual(password, SYS_OPS_KEY)) return next();
+    
+    res.set('WWW-Authenticate', 'Basic realm="Proxy Dashboard"');
+    return res.status(401).send('Authentication required.');
+  }
+  next();
+});
+
+// ─── 3. Serve UI ───
 app.use(express.static(path.join(__dirname, 'public')));
 
-// ─── 3. API AUTH (Bearer Token) ───
+// ─── 4. API AUTH ───
 app.use((req, res, next) => {
-  if (req.path === '/health' || req.path === '/v1/models') return next();
+  if (req.path === '/health' || req.path === '/v1/models' || req.path.startsWith('/_sys')) return next();
   
   const token = req.headers.authorization?.replace('Bearer ', '').trim();
   if (!token || !CLIENT_AUTH_KEY || !safeTimingEqual(token, CLIENT_AUTH_KEY)) {
@@ -97,6 +136,32 @@ app.use((req, res, next) => {
   next();
 });
 
+// ─── 5. HIDDEN SYSTEM ROUTES (Renamed from /admin) ───
+app.use('/_sys', (req, res, next) => {
+  const token = req.headers.authorization?.replace('Bearer ', '').trim();
+  if (!token || !safeTimingEqual(token, SYS_OPS_KEY)) {
+    // Return standard 404 so attackers think the route doesn't exist
+    return res.status(404).json({ error: { message: 'Not Found' } });
+  }
+  next();
+});
+
+app.get('/_sys/blocked', (req, res) => res.json(Array.from(blockedIPs)));
+app.post('/_sys/block', (req, res) => {
+  if (req.body.ip) blockedIPs.add(req.body.ip);
+  res.json({ success: true });
+});
+app.post('/_sys/unblock', (req, res) => {
+  if (req.body.ip) blockedIPs.delete(req.body.ip);
+  res.json({ success: true });
+});
+app.get('/_sys/flagged', (req, res) => res.json(flaggedRequests));
+app.delete('/_sys/flagged', (req, res) => {
+  flaggedRequests.length = 0;
+  res.json({ success: true });
+});
+
+// ─── 6. HELPER FUNCTIONS ───
 function safeWrite(res, data) {
   try { if (!res.writableEnded && !res.destroyed) res.write(data); } catch {}
 }
@@ -144,8 +209,10 @@ app.get('/v1/models', (req, res) => {
   res.json({ object: 'list', data: Object.keys(MODEL_MAPPING).map(id => ({ id, object: 'model', owned_by: 'proxy' })) });
 });
 
+// ─── 7. CHAT COMPLETION ───
 app.post('/v1/chat/completions', async (req, res) => {
   const startTime = Date.now();
+  const ip = getIP(req);
   let upstreamStream = null;
   let heartbeat = null;
   let progressTimer = null;
@@ -163,6 +230,32 @@ app.post('/v1/chat/completions', async (req, res) => {
 
   try {
     const isStream = !!req.body.stream;
+    
+    // MODERATION FILTER
+    const messageText = JSON.stringify(req.body.messages || '').toLowerCase();
+    const violatedWord = SUS_WORDS.find(w => messageText.includes(w));
+    
+    if (violatedWord) {
+      const flag = {
+        time: Date.now(),
+        ip: ip,
+        prompt: messageText.slice(0, 500) + '...',
+        reason: `Matched keyword: ${violatedWord}`
+      };
+      flaggedRequests.push(flag);
+      if (flaggedRequests.length > 50) flaggedRequests.shift();
+
+      if (DISCORD_WEBHOOK_URL) {
+        axios.post(DISCORD_WEBHOOK_URL, {
+          content: `🚨 **Security Alert: Sus Request Blocked**\n**IP:** ${ip}\n**Reason:** ${flag.reason}\n**Prompt:** \`\`\`${flag.prompt}\`\`\``
+        }).catch(() => {});
+      }
+
+      return res.status(400).json({ 
+        error: { message: 'Request flagged by security filter.', type: 'moderation_block', code: 400 } 
+      });
+    }
+
     if (isStream) {
       res.setHeader('Content-Type', 'text/event-stream');
       res.setHeader('Cache-Control', 'no-cache, no-transform');
@@ -190,7 +283,7 @@ app.post('/v1/chat/completions', async (req, res) => {
     delete baseReq.stream_options; 
 
     const payload = { ...baseReq, model: primary, ...getReasoningPayload(primary, ENABLE_THINKING_MODE, reasoning_effort) };
-    console.log(`[UPSTREAM] Sending request to ${primary} | payload: ${JSON.stringify(payload.reasoning_effort || {})}`);
+    console.log(`[UPSTREAM] ${ip} -> ${primary} | payload: ${JSON.stringify(payload.reasoning_effort || {})}`);
 
     const response = await postToUpstream(payload, abortController.signal);
     const usedModel = primary;
