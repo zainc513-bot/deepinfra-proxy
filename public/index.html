@@ -16,8 +16,33 @@
       --accent-hover: #4f46e5;
       --success: #10b981;
       --danger: #ef4444;
+      --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+
+    /* ─── HACKER THEME (Overrides) ─── */
+    body.hacker-theme {
+      --bg: #000000;
+      --panel: #001100;
+      --border: #00ff00;
+      --text: #00ff00;
+      --text-muted: #00aa00;
+      --accent: #00ff00;
+      --accent-hover: #00cc00;
+      --success: #00ff00;
+      --danger: #ff0000;
+      --font: 'Courier New', Courier, monospace;
+      text-shadow: 0 0 2px rgba(0, 255, 0, 0.5);
+    }
+    body.hacker-theme .nav { box-shadow: 0 4px 15px rgba(0, 255, 0, 0.1); }
+    body.hacker-theme .bubble { border-radius: 0; border: 1px solid var(--border); }
+    body.hacker-theme .user .bubble { background: #003300; color: #00ff00; border-color: #00ff00; }
+    body.hacker-theme input, body.hacker-theme select, body.hacker-theme textarea { border: 1px solid #00ff00; background: #000; color: #00ff00; border-radius: 0; }
+    body.hacker-theme button { border: 1px solid #00ff00; background: #000; color: #00ff00; border-radius: 0; }
+    body.hacker-theme button:hover { background: #00ff00; color: #000; }
+    body.hacker-theme .table-container, body.hacker-theme .chart-container { border-radius: 0; box-shadow: 0 0 10px rgba(0, 255, 0, 0.2); }
+    body.hacker-theme th { background: #001100; color: #00ff00; border-bottom: 1px solid #00ff00; }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: var(--font); transition: background 0.3s, color 0.3s; }
     body { background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
     
     .nav { background: var(--panel); border-bottom: 1px solid var(--border); display: flex; padding: 0 20px; overflow-x: auto; }
@@ -28,6 +53,7 @@
     .layout { display: flex; flex: 1; overflow: hidden; }
     .sidebar { width: 320px; background: var(--panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 20px; gap: 20px; overflow-y: auto; }
     .logo { font-size: 1.5rem; font-weight: 700; background: linear-gradient(to right, #818cf8, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 10px; }
+    body.hacker-theme .logo { background: #00ff00; -webkit-background-clip: text; }
     
     .form-group { display: flex; flex-direction: column; gap: 6px; }
     .form-group label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); font-weight: 600; }
@@ -37,9 +63,12 @@
     button:hover { background: var(--accent-hover); }
     
     .info-box { background: rgba(99, 102, 241, 0.1); border: 1px solid rgba(99, 102, 241, 0.2); padding: 12px; border-radius: 8px; font-size: 0.8rem; color: #a5b4fc; line-height: 1.5; }
+    body.hacker-theme .info-box { background: #001100; border-color: #00ff00; color: #00ff00; }
     .copy-btn { background: #2a2e45; padding: 6px; font-size: 0.75rem; margin-top: 8px; width: 100%; }
+    body.hacker-theme .copy-btn { background: #003300; border: 1px solid #00ff00; }
 
     .view-container { flex: 1; display: flex; flex-direction: column; background: #0b0d14; overflow: hidden; }
+    body.hacker-theme .view-container { background: #000; }
     .view { display: none; flex-direction: column; height: 100%; overflow: hidden; }
     .view.active { display: flex; }
 
@@ -50,8 +79,10 @@
     .message { display: flex; gap: 12px; max-width: 85%; }
     .message.user { align-self: flex-end; flex-direction: row-reverse; }
     .avatar { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.8rem; flex-shrink: 0; }
-    .user .avatar { background: var(--accent); }
-    .assistant .avatar { background: var(--success); }
+    .user .avatar { background: var(--accent); color: #fff; }
+    .assistant .avatar { background: var(--success); color: #fff; }
+    body.hacker-theme .user .avatar { background: #003300; border: 1px solid #00ff00; }
+    body.hacker-theme .assistant .avatar { background: #003300; border: 1px solid #00ff00; }
     .bubble { padding: 12px 16px; border-radius: 12px; line-height: 1.6; font-size: 0.95rem; white-space: pre-wrap; word-wrap: break-word; }
     .user .bubble { background: var(--accent); color: white; border-bottom-right-radius: 4px; }
     .assistant .bubble { background: var(--panel); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
@@ -69,18 +100,23 @@
     td { padding: 12px 16px; border-bottom: 1px solid var(--border); }
     tr:last-child td { border-bottom: none; }
     tr:hover { background: rgba(255, 255, 255, 0.02); }
+    body.hacker-theme tr:hover { background: rgba(0, 255, 0, 0.1); }
     
     .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
     .badge.success { background: rgba(16, 185, 129, 0.2); color: var(--success); }
     .badge.error { background: rgba(239, 68, 68, 0.2); color: var(--danger); }
+    body.hacker-theme .badge.success { background: #003300; border: 1px solid #00ff00; }
+    body.hacker-theme .badge.error { background: #330000; border: 1px solid #ff0000; color: #ff0000; }
 
     .admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
     .sus-prompt { font-family: monospace; font-size: 0.8rem; background: #0b0d14; padding: 10px; border-radius: 6px; border: 1px solid var(--border); margin-top: 5px; white-space: pre-wrap; max-height: 100px; overflow-y: auto; }
+    body.hacker-theme .sus-prompt { background: #000; border-color: #00ff00; color: #00ff00; }
 
     ::-webkit-scrollbar { width: 8px; }
     ::-webkit-scrollbar-track { background: var(--bg); }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
     ::-webkit-scrollbar-thumb:hover { background: #3f4460; }
+    body.hacker-theme ::-webkit-scrollbar-thumb { background: #00ff00; }
   </style>
 </head>
 <body>
@@ -88,13 +124,16 @@
   <div class="nav" id="main-nav">
     <div class="nav-item active" onclick="switchTab('chat')">Playground</div>
     <div class="nav-item" onclick="switchTab('metrics')">Metrics & Graphs</div>
-    <!-- The hidden tab will be injected here by JS -->
+    <!-- Hidden Admin Tab gets injected here -->
   </div>
 
   <div class="layout">
     <div class="sidebar">
       <div class="logo">DeepInfra Proxy</div>
+      
+      <!-- Hidden Sys Key Input -->
       <div class="form-group" id="sys-key-group" style="display: none;"></div>
+
       <div class="form-group">
         <label>Client API Key (For Users)</label>
         <input type="password" id="apiKey" placeholder="CLIENT_AUTH_KEY..." oninput="saveSettings()">
@@ -183,6 +222,8 @@
         </div>
       </div>
 
+      <!-- Hidden Admin View injected here -->
+
     </div>
   </div>
 
@@ -225,7 +266,6 @@
       document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
       
-      // Find the nav item that was clicked by ID or text match
       const navItems = document.querySelectorAll('.nav-item');
       navItems.forEach(item => {
         if (item.getAttribute('onclick') && item.getAttribute('onclick').includes(tabId)) {
@@ -269,16 +309,21 @@
 
       const ctx = document.getElementById('speedChart').getContext('2d');
       if (chartInstance) chartInstance.destroy();
-      Chart.defaults.color = '#94a3b8';
-      Chart.defaults.borderColor = '#2a2e45';
+      
+      const isHacker = document.body.classList.contains('hacker-theme');
+      const color1 = isHacker ? '#00ff00' : '#6366f1';
+      const color2 = isHacker ? '#00aa00' : '#10b981';
+      
+      Chart.defaults.color = isHacker ? '#00ff00' : '#94a3b8';
+      Chart.defaults.borderColor = isHacker ? '#004400' : '#2a2e45';
 
       chartInstance = new Chart(ctx, {
         type: 'line',
         data: {
           labels: metrics.map((_, i) => `Req ${i + 1}`),
           datasets: [
-            { label: 'TTFT (ms)', data: metrics.map(m => m.ttft || 0), borderColor: '#6366f1', backgroundColor: 'rgba(99, 102, 241, 0.1)', tension: 0.3, fill: true },
-            { label: 'Total Time (ms)', data: metrics.map(m => m.total || 0), borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', tension: 0.3, fill: true }
+            { label: 'TTFT (ms)', data: metrics.map(m => m.ttft || 0), borderColor: color1, backgroundColor: 'transparent', tension: 0.3, fill: false },
+            { label: 'Total Time (ms)', data: metrics.map(m => m.total || 0), borderColor: color2, backgroundColor: 'transparent', tension: 0.3, fill: false }
           ]
         },
         options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false } }
@@ -378,7 +423,7 @@
       return msgDiv.querySelector('.bubble');
     }
 
-    // ─── SECRET SYSTEM LOGIC ───
+    // ─── SECRET ADMIN & HACKER THEME LOGIC ───
     
     // Listen for the secret key combo (Ctrl + Shift + X)
     document.addEventListener('keydown', (e) => {
@@ -391,7 +436,10 @@
       // Check if already unlocked
       if (document.getElementById('view-sys')) return;
 
-      // 1. Inject the Nav Tab
+      // 1. APPLY HACKER THEME
+      document.body.classList.add('hacker-theme');
+
+      // 2. Inject the Nav Tab
       const nav = document.getElementById('main-nav');
       const tab = document.createElement('div');
       tab.className = 'nav-item';
@@ -399,51 +447,51 @@
       tab.setAttribute('onclick', "switchTab('sys')");
       nav.appendChild(tab);
 
-      // 2. Inject the Sys Key input field in the sidebar
+      // 3. Inject the Sys Key input field in the sidebar
       const sysGroup = document.getElementById('sys-key-group');
       sysGroup.style.display = 'flex';
       sysGroup.innerHTML = `
-        <label>System Key</label>
-        <input type="password" id="sysKey" placeholder="Key..." oninput="saveSettings()">
+        <label>System Key (Root)</label>
+        <input type="password" id="sysKey" placeholder="ENTER KEY..." oninput="saveSettings()">
       `;
       document.getElementById('sysKey').value = localStorage.getItem('sys_key') || '';
 
-      // 3. Build the Admin View entirely from JS
+      // 4. Build the Admin View entirely from JS
       const viewContainer = document.getElementById('view-container');
       const view = document.createElement('div');
       view.className = 'view';
       view.id = 'view-sys';
       view.innerHTML = `
         <div class="chat-header">
-          <h2>System Logs</h2>
-          <button onclick="refreshSys()" style="padding: 6px 12px; font-size: 0.75rem; background: var(--accent);">Refresh Data</button>
+          <h2 style="color: #00ff00; text-shadow: 0 0 5px #00ff00;">[ SYSTEM_LOGS ]</h2>
+          <button onclick="refreshSys()" style="padding: 6px 12px; font-size: 0.75rem;">REFRESH_DATA</button>
         </div>
         <div class="metrics-content admin-grid">
           
           <!-- Flagged Requests -->
           <div class="table-container">
             <div style="padding: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-              <h3 style="font-size: 0.9rem;">🚨 Flagged Requests</h3>
-              <button onclick="clearSysFlagged()" style="padding: 4px 8px; font-size: 0.7rem; background: var(--danger);">Clear</button>
+              <h3 style="font-size: 0.9rem;">🚨 FLAGGED_TRAFFIC</h3>
+              <button onclick="clearSysFlagged()" style="padding: 4px 8px; font-size: 0.7rem; background: #ff0000; color: #fff;">PURGE</button>
             </div>
             <div id="flagged-list" style="padding: 15px; display: flex; flex-direction: column; gap: 15px; max-height: 500px; overflow-y: auto;">
-              <div style="color: var(--text-muted); font-size: 0.85rem;">No flagged requests.</div>
+              <div style="color: var(--text-muted); font-size: 0.85rem;">> NO_FLAGS_DETECTED</div>
             </div>
           </div>
 
           <!-- Blocked IPs -->
           <div class="table-container">
             <div style="padding: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-              <h3 style="font-size: 0.9rem;">🛑 Blocked IP Addresses</h3>
+              <h3 style="font-size: 0.9rem;">🛑 BLOCKED_NODES</h3>
               <div style="display: flex; gap: 8px;">
-                <input type="text" id="manual-ip" placeholder="IP..." style="padding: 4px 8px; font-size: 0.75rem; width: 120px;">
-                <button onclick="blockSysIP()" style="padding: 4px 8px; font-size: 0.7rem; background: var(--danger);">Block</button>
+                <input type="text" id="manual-ip" placeholder="IP_ADDR..." style="padding: 4px 8px; font-size: 0.75rem; width: 120px;">
+                <button onclick="blockSysIP()" style="padding: 4px 8px; font-size: 0.7rem; background: #ff0000; color: #fff;">BLOCK</button>
               </div>
             </div>
             <div id="blocked-list" style="max-height: 500px; overflow-y: auto;">
               <table>
                 <thead>
-                  <tr><th>IP Address</th><th>Action</th></tr>
+                  <tr><th>IP_ADDRESS</th><th>ACTION</th></tr>
                 </thead>
                 <tbody id="blocked-body"></tbody>
               </table>
@@ -472,11 +520,11 @@
         document.getElementById('blocked-body').innerHTML = ips.length ? ips.map(ip => `
           <tr>
             <td>${ip}</td>
-            <td><button onclick="unblockSysIP('${ip}')" style="padding: 2px 8px; font-size: 0.7rem; background: var(--success);">Unblock</button></td>
+            <td><button onclick="unblockSysIP('${ip}')" style="padding: 2px 8px; font-size: 0.7rem;">UNBLOCK</button></td>
           </tr>
-        `).join('') : '<tr><td colspan="2" style="color:var(--text-muted)">No blocked IPs.</td></tr>';
+        `).join('') : '<tr><td colspan="2" style="color:var(--text-muted)">> NO_BLOCKED_NODES</td></tr>';
       } catch (e) { 
-        document.getElementById('blocked-body').innerHTML = `<tr><td colspan="2" style="color:var(--danger)">Auth Failed</td></tr>`;
+        document.getElementById('blocked-body').innerHTML = `<tr><td colspan="2" style="color:var(--danger)">> AUTH_FAILED</td></tr>`;
       }
 
       try {
@@ -490,12 +538,12 @@
               <span>IP: ${f.ip}</span>
               <span>${new Date(f.time).toLocaleTimeString()}</span>
             </div>
-            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">Reason: ${f.reason}</div>
+            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">REASON: ${f.reason}</div>
             <div class="sus-prompt">${f.prompt}</div>
           </div>
-        `).join('') : '<div style="color: var(--text-muted); font-size: 0.85rem;">No flagged requests.</div>';
+        `).join('') : '<div style="color: var(--text-muted); font-size: 0.85rem;">> NO_FLAGS_DETECTED</div>';
       } catch (e) { 
-        document.getElementById('flagged-list').innerHTML = `<div style="color:var(--danger); font-size:0.85rem;">Auth Failed</div>`;
+        document.getElementById('flagged-list').innerHTML = `<div style="color:var(--danger); font-size:0.85rem;">> AUTH_FAILED</div>`;
       }
     }
 
