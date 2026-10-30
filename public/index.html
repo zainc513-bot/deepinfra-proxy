@@ -19,7 +19,6 @@
       --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
 
-    /* ─── HACKER THEME (Overrides) ─── */
     body.hacker-theme {
       --bg: #000000;
       --panel: #001100;
@@ -108,10 +107,6 @@
     body.hacker-theme .badge.success { background: #003300; border: 1px solid #00ff00; }
     body.hacker-theme .badge.error { background: #330000; border: 1px solid #ff0000; color: #ff0000; }
 
-    .admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-    .sus-prompt { font-family: monospace; font-size: 0.8rem; background: #0b0d14; padding: 10px; border-radius: 6px; border: 1px solid var(--border); margin-top: 5px; white-space: pre-wrap; max-height: 100px; overflow-y: auto; }
-    body.hacker-theme .sus-prompt { background: #000; border-color: #00ff00; color: #00ff00; }
-
     ::-webkit-scrollbar { width: 8px; }
     ::-webkit-scrollbar-track { background: var(--bg); }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
@@ -124,14 +119,12 @@
   <div class="nav" id="main-nav">
     <div class="nav-item active" onclick="switchTab('chat')">Playground</div>
     <div class="nav-item" onclick="switchTab('metrics')">Metrics & Graphs</div>
-    <!-- Hidden Admin Tab gets injected here -->
   </div>
 
   <div class="layout">
     <div class="sidebar">
       <div class="logo">DeepInfra Proxy</div>
       
-      <!-- Hidden Sys Key Input -->
       <div class="form-group" id="sys-key-group" style="display: none;"></div>
 
       <div class="form-group">
@@ -173,7 +166,6 @@
 
     <div class="view-container" id="view-container">
       
-      <!-- Chat View -->
       <div class="view active" id="view-chat">
         <div class="chat-header">
           <h2>Playground (Streaming)</h2>
@@ -194,7 +186,6 @@
         </div>
       </div>
 
-      <!-- Metrics View -->
       <div class="view" id="view-metrics">
         <div class="chat-header">
           <h2>Performance Analytics</h2>
@@ -221,8 +212,6 @@
           </div>
         </div>
       </div>
-
-      <!-- Hidden Admin View injected here -->
 
     </div>
   </div>
@@ -424,8 +413,6 @@
     }
 
     // ─── SECRET ADMIN & HACKER THEME LOGIC ───
-    
-    // Listen for the secret key combo (Ctrl + Shift + X)
     document.addEventListener('keydown', (e) => {
       if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'x') {
         unlockSys();
@@ -433,13 +420,10 @@
     });
 
     function unlockSys() {
-      // Check if already unlocked
       if (document.getElementById('view-sys')) return;
 
-      // 1. APPLY HACKER THEME
       document.body.classList.add('hacker-theme');
 
-      // 2. Inject the Nav Tab
       const nav = document.getElementById('main-nav');
       const tab = document.createElement('div');
       tab.className = 'nav-item';
@@ -447,7 +431,6 @@
       tab.setAttribute('onclick', "switchTab('sys')");
       nav.appendChild(tab);
 
-      // 3. Inject the Sys Key input field in the sidebar
       const sysGroup = document.getElementById('sys-key-group');
       sysGroup.style.display = 'flex';
       sysGroup.innerHTML = `
@@ -456,7 +439,6 @@
       `;
       document.getElementById('sysKey').value = localStorage.getItem('sys_key') || '';
 
-      // 4. Build the Admin View entirely from JS
       const viewContainer = document.getElementById('view-container');
       const view = document.createElement('div');
       view.className = 'view';
@@ -466,19 +448,8 @@
           <h2 style="color: #00ff00; text-shadow: 0 0 5px #00ff00;">[ SYSTEM_LOGS ]</h2>
           <button onclick="refreshSys()" style="padding: 6px 12px; font-size: 0.75rem;">REFRESH_DATA</button>
         </div>
-        <div class="metrics-content admin-grid">
+        <div class="metrics-content">
           
-          <!-- Flagged Requests -->
-          <div class="table-container">
-            <div style="padding: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-              <h3 style="font-size: 0.9rem;">🚨 FLAGGED_TRAFFIC</h3>
-              <button onclick="clearSysFlagged()" style="padding: 4px 8px; font-size: 0.7rem; background: #ff0000; color: #fff;">PURGE</button>
-            </div>
-            <div id="flagged-list" style="padding: 15px; display: flex; flex-direction: column; gap: 15px; max-height: 500px; overflow-y: auto;">
-              <div style="color: var(--text-muted); font-size: 0.85rem;">> NO_FLAGS_DETECTED</div>
-            </div>
-          </div>
-
           <!-- Blocked IPs -->
           <div class="table-container">
             <div style="padding: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
@@ -488,7 +459,7 @@
                 <button onclick="blockSysIP()" style="padding: 4px 8px; font-size: 0.7rem; background: #ff0000; color: #fff;">BLOCK</button>
               </div>
             </div>
-            <div id="blocked-list" style="max-height: 500px; overflow-y: auto;">
+            <div id="blocked-list" style="max-height: 600px; overflow-y: auto;">
               <table>
                 <thead>
                   <tr><th>IP_ADDRESS</th><th>ACTION</th></tr>
@@ -502,7 +473,6 @@
       `;
       viewContainer.appendChild(view);
 
-      // Auto-switch to the new tab
       switchTab('sys');
     }
 
@@ -525,25 +495,6 @@
         `).join('') : '<tr><td colspan="2" style="color:var(--text-muted)">> NO_BLOCKED_NODES</td></tr>';
       } catch (e) { 
         document.getElementById('blocked-body').innerHTML = `<tr><td colspan="2" style="color:var(--danger)">> AUTH_FAILED</td></tr>`;
-      }
-
-      try {
-        const res = await fetch('/_sys/flagged', { headers });
-        const flagged = await res.json();
-        if (flagged.error) throw new Error(flagged.error.message);
-
-        document.getElementById('flagged-list').innerHTML = flagged.length ? flagged.map(f => `
-          <div style="border-bottom: 1px solid var(--border); padding-bottom: 10px;">
-            <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: var(--danger); font-weight: bold;">
-              <span>IP: ${f.ip}</span>
-              <span>${new Date(f.time).toLocaleTimeString()}</span>
-            </div>
-            <div style="font-size: 0.8rem; color: var(--text-muted); margin-top: 4px;">REASON: ${f.reason}</div>
-            <div class="sus-prompt">${f.prompt}</div>
-          </div>
-        `).join('') : '<div style="color: var(--text-muted); font-size: 0.85rem;">> NO_FLAGS_DETECTED</div>';
-      } catch (e) { 
-        document.getElementById('flagged-list').innerHTML = `<div style="color:var(--danger); font-size:0.85rem;">> AUTH_FAILED</div>`;
       }
     }
 
@@ -568,12 +519,6 @@
         headers: { 'Authorization': 'Bearer ' + adminPass, 'Content-Type': 'application/json' },
         body: JSON.stringify({ ip })
       });
-      refreshSys();
-    }
-
-    async function clearSysFlagged() {
-      const adminPass = document.getElementById('sysKey')?.value.trim();
-      await fetch('/_sys/flagged', { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + adminPass } });
       refreshSys();
     }
   </script>
