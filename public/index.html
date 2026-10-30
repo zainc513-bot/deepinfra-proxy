@@ -88,18 +88,13 @@
   <div class="nav" id="main-nav">
     <div class="nav-item active" onclick="switchTab('chat')">Playground</div>
     <div class="nav-item" onclick="switchTab('metrics')">Metrics & Graphs</div>
-    <!-- Admin tab will be injected here by JS if you press the secret code -->
+    <!-- The hidden tab will be injected here by JS -->
   </div>
 
   <div class="layout">
     <div class="sidebar">
       <div class="logo">DeepInfra Proxy</div>
-
-      <div class="form-group" id="sys-key-group" style="display: none;">
-        <label>System Key (Hidden)</label>
-        <input type="password" id="sysKey" placeholder="Sys Ops Key..." oninput="saveSettings()">
-      </div>
-
+      <div class="form-group" id="sys-key-group" style="display: none;"></div>
       <div class="form-group">
         <label>Client API Key (For Users)</label>
         <input type="password" id="apiKey" placeholder="CLIENT_AUTH_KEY..." oninput="saveSettings()">
@@ -137,7 +132,7 @@
       </div>
     </div>
 
-    <div class="view-container">
+    <div class="view-container" id="view-container">
       
       <!-- Chat View -->
       <div class="view active" id="view-chat">
@@ -188,49 +183,6 @@
         </div>
       </div>
 
-      <!-- HIDDEN ADMIN TEMPLATE (Invisible to normal users) -->
-      <template id="secret-admin-template">
-        <div class="view" id="view-admin">
-          <div class="chat-header">
-            <h2>Security & Administration</h2>
-            <button onclick="refreshAdmin()" style="padding: 6px 12px; font-size: 0.75rem; background: var(--accent);">Refresh Data</button>
-          </div>
-          <div class="metrics-content admin-grid">
-            
-            <!-- Flagged Requests -->
-            <div class="table-container">
-              <div style="padding: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-                <h3 style="font-size: 0.9rem;">🚨 Flagged "Sus" Requests</h3>
-                <button onclick="clearFlagged()" style="padding: 4px 8px; font-size: 0.7rem; background: var(--danger);">Clear</button>
-              </div>
-              <div id="flagged-list" style="padding: 15px; display: flex; flex-direction: column; gap: 15px; max-height: 500px; overflow-y: auto;">
-                <div style="color: var(--text-muted); font-size: 0.85rem;">No flagged requests.</div>
-              </div>
-            </div>
-
-            <!-- Blocked IPs -->
-            <div class="table-container">
-              <div style="padding: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
-                <h3 style="font-size: 0.9rem;">🛑 Blocked IP Addresses</h3>
-                <div style="display: flex; gap: 8px;">
-                  <input type="text" id="manual-ip" placeholder="IP..." style="padding: 4px 8px; font-size: 0.75rem; width: 120px;">
-                  <button onclick="blockIP()" style="padding: 4px 8px; font-size: 0.7rem; background: var(--danger);">Block</button>
-                </div>
-              </div>
-              <div id="blocked-list" style="max-height: 500px; overflow-y: auto;">
-                <table>
-                  <thead>
-                    <tr><th>IP Address</th><th>Action</th></tr>
-                  </thead>
-                  <tbody id="blocked-body"></tbody>
-                </table>
-              </div>
-            </div>
-
-          </div>
-        </div>
-      </template>
-
     </div>
   </div>
 
@@ -245,7 +197,6 @@
     
     document.getElementById('proxy-url').textContent = window.location.origin + '/v1';
 
-    // Load saved data
     function loadSettings() {
       if(sysKeyEl) sysKeyEl.value = localStorage.getItem('sys_key') || '';
       apiKeyEl.value = localStorage.getItem('proxy_key') || '';
@@ -273,11 +224,19 @@
     function switchTab(tabId) {
       document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
-      event.target.classList.add('active');
+      
+      // Find the nav item that was clicked by ID or text match
+      const navItems = document.querySelectorAll('.nav-item');
+      navItems.forEach(item => {
+        if (item.getAttribute('onclick') && item.getAttribute('onclick').includes(tabId)) {
+          item.classList.add('active');
+        }
+      });
+      
       document.getElementById(`view-${tabId}`).classList.add('active');
 
       if (tabId === 'metrics') renderMetrics();
-      if (tabId === 'admin') refreshAdmin();
+      if (tabId === 'sys') refreshSys();
     }
 
     // ─── CHAT & METRICS LOGIC ───
@@ -419,43 +378,87 @@
       return msgDiv.querySelector('.bubble');
     }
 
-    // ─── SECRET ADMIN LOGIC ───
+    // ─── SECRET SYSTEM LOGIC ───
     
-    // 1. Listen for the secret key combo (Ctrl + Shift + X)
+    // Listen for the secret key combo (Ctrl + Shift + X)
     document.addEventListener('keydown', (e) => {
       if (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'x') {
-        unlockAdmin();
+        unlockSys();
       }
     });
 
-    function unlockAdmin() {
+    function unlockSys() {
       // Check if already unlocked
-      if (document.getElementById('view-admin')) return;
+      if (document.getElementById('view-sys')) return;
 
-      // Inject the Admin Tab button
+      // 1. Inject the Nav Tab
       const nav = document.getElementById('main-nav');
-      const adminTab = document.createElement('div');
-      adminTab.className = 'nav-item';
-      adminTab.textContent = 'Security & Admin';
-      adminTab.onclick = () => switchTab('admin');
-      nav.appendChild(adminTab);
+      const tab = document.createElement('div');
+      tab.className = 'nav-item';
+      tab.textContent = 'System Logs';
+      tab.setAttribute('onclick', "switchTab('sys')");
+      nav.appendChild(tab);
 
-      // Inject the Admin Panel UI from the hidden <template>
-      const template = document.getElementById('secret-admin-template');
-      const clone = template.content.cloneNode(true);
-      document.querySelector('.view-container').appendChild(clone);
+      // 2. Inject the Sys Key input field in the sidebar
+      const sysGroup = document.getElementById('sys-key-group');
+      sysGroup.style.display = 'flex';
+      sysGroup.innerHTML = `
+        <label>System Key</label>
+        <input type="password" id="sysKey" placeholder="Key..." oninput="saveSettings()">
+      `;
+      document.getElementById('sysKey').value = localStorage.getItem('sys_key') || '';
 
-      // Unhide the Sys Key input field in the sidebar
-      document.getElementById('sys-key-group').style.display = 'flex';
+      // 3. Build the Admin View entirely from JS
+      const viewContainer = document.getElementById('view-container');
+      const view = document.createElement('div');
+      view.className = 'view';
+      view.id = 'view-sys';
+      view.innerHTML = `
+        <div class="chat-header">
+          <h2>System Logs</h2>
+          <button onclick="refreshSys()" style="padding: 6px 12px; font-size: 0.75rem; background: var(--accent);">Refresh Data</button>
+        </div>
+        <div class="metrics-content admin-grid">
+          
+          <!-- Flagged Requests -->
+          <div class="table-container">
+            <div style="padding: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+              <h3 style="font-size: 0.9rem;">🚨 Flagged Requests</h3>
+              <button onclick="clearSysFlagged()" style="padding: 4px 8px; font-size: 0.7rem; background: var(--danger);">Clear</button>
+            </div>
+            <div id="flagged-list" style="padding: 15px; display: flex; flex-direction: column; gap: 15px; max-height: 500px; overflow-y: auto;">
+              <div style="color: var(--text-muted); font-size: 0.85rem;">No flagged requests.</div>
+            </div>
+          </div>
 
-      // Auto-switch to the Admin tab
-      switchTab('admin', adminTab);
-      
-      // Visual confirmation
-      console.log("Admin mode unlocked.");
+          <!-- Blocked IPs -->
+          <div class="table-container">
+            <div style="padding: 15px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+              <h3 style="font-size: 0.9rem;">🛑 Blocked IP Addresses</h3>
+              <div style="display: flex; gap: 8px;">
+                <input type="text" id="manual-ip" placeholder="IP..." style="padding: 4px 8px; font-size: 0.75rem; width: 120px;">
+                <button onclick="blockSysIP()" style="padding: 4px 8px; font-size: 0.7rem; background: var(--danger);">Block</button>
+              </div>
+            </div>
+            <div id="blocked-list" style="max-height: 500px; overflow-y: auto;">
+              <table>
+                <thead>
+                  <tr><th>IP Address</th><th>Action</th></tr>
+                </thead>
+                <tbody id="blocked-body"></tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+      `;
+      viewContainer.appendChild(view);
+
+      // Auto-switch to the new tab
+      switchTab('sys');
     }
 
-    async function refreshAdmin() {
+    async function refreshSys() {
       const adminPass = document.getElementById('sysKey')?.value.trim();
       if (!adminPass) return console.warn("No Sys Key provided.");
 
@@ -469,7 +472,7 @@
         document.getElementById('blocked-body').innerHTML = ips.length ? ips.map(ip => `
           <tr>
             <td>${ip}</td>
-            <td><button onclick="unblockIP('${ip}')" style="padding: 2px 8px; font-size: 0.7rem; background: var(--success);">Unblock</button></td>
+            <td><button onclick="unblockSysIP('${ip}')" style="padding: 2px 8px; font-size: 0.7rem; background: var(--success);">Unblock</button></td>
           </tr>
         `).join('') : '<tr><td colspan="2" style="color:var(--text-muted)">No blocked IPs.</td></tr>';
       } catch (e) { 
@@ -496,7 +499,7 @@
       }
     }
 
-    async function blockIP() {
+    async function blockSysIP() {
       const ip = document.getElementById('manual-ip').value.trim();
       const adminPass = document.getElementById('sysKey')?.value.trim();
       if (!ip || !adminPass) return;
@@ -507,23 +510,23 @@
         body: JSON.stringify({ ip })
       });
       document.getElementById('manual-ip').value = '';
-      refreshAdmin();
+      refreshSys();
     }
 
-    async function unblockIP(ip) {
+    async function unblockSysIP(ip) {
       const adminPass = document.getElementById('sysKey')?.value.trim();
       await fetch('/_sys/unblock', {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + adminPass, 'Content-Type': 'application/json' },
         body: JSON.stringify({ ip })
       });
-      refreshAdmin();
+      refreshSys();
     }
 
-    async function clearFlagged() {
+    async function clearSysFlagged() {
       const adminPass = document.getElementById('sysKey')?.value.trim();
       await fetch('/_sys/flagged', { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + adminPass } });
-      refreshAdmin();
+      refreshSys();
     }
   </script>
 </body>
